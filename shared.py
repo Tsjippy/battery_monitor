@@ -12,8 +12,8 @@ mqtt_port       = 1883
 
 class MqqtToHa:
     def __init__(self, device, sensors):
-        self.device     = device
-        self.sensors    = sensors
+        self.device         = device
+        self.sensors        = sensors
 
         #Store send commands till they are received
         self.sent           = {}
@@ -32,7 +32,7 @@ class MqqtToHa:
         for sensor in self.sensors.values():
             print(sensor)
 
-            base_topic      = "homeassistant/sensor/" + self.device['identifiers'][0] + '/' + sensor['name'].lower()
+            base_topic      = "homeassistant/sensor/" + self.device['identifiers'][0] + '/' + sensor['name'].replace(' ', '_').lower()
             unique_id       = (self.device['name'] + '_' + sensor['name']).lower().replace(" ", "_")
 
             print("Creating sensor '" + sensor['name'] + "' with unique id " + unique_id)
@@ -92,7 +92,7 @@ class MqqtToHa:
 
     # Sends a sensor value
     def send_value(self, name, value):
-        topic                   = "homeassistant/sensor/" + self.device['identifiers'][0] + '/' + name.lower() + "/state"
+        topic                   = "homeassistant/sensor/" + self.device['identifiers'][0] + '/' + name.replace(' ', '_').lower() + "/state"
         payload                 = json.dumps(value)
 
         # add current messgae to the queue

@@ -1,6 +1,4 @@
 import shared
-import time
-import json
 
 # The main device that contains the sensors
 device              = {

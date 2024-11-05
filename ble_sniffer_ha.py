@@ -9,6 +9,7 @@ updateInterval      = 10 #in seconds
 debug               = False
 NOTIFY_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb'
 MAC_ADDRESS         = '38:3b:26:79:6f:c5'
+battery_capacity_ah = 400 # Ah
 
 class AnyDeviceManager(gatt.DeviceManager):
     def device_discovered(self, device):
@@ -26,6 +27,8 @@ class AnyDevice(gatt.Device):
     def connect_failed(self, error):
         super().connect_failed(error)
         print("[%s] Connection failed: %s" % (self.mac_address, str(error)))
+        # Try to connect again
+        connect()
 
     def disconnect_succeeded(self):
         super().disconnect_succeeded()
@@ -68,14 +71,14 @@ class AnyDevice(gatt.Device):
         else:
             self.avg_values[key].append(value)
             
-    def average(self,lst, decimals=1): 
+    def average(self, lst, decimals=1): 
         if debug:
             print(lst)
             
         if len(lst)  == 0:
-            return 0
+            return -99
             
-        return round(sum(lst) / len(lst) , decimals)
+        return round((sum(lst) / len(lst)) , decimals)
         
     def send_to_ha(self):
         if debug:
@@ -89,14 +92,15 @@ class AnyDevice(gatt.Device):
             for key, value in self.avg_values.items():
                 name    = sensors.sensors[key]['name']
 
-                if key == "voltage" or key == "current" or key == "power" or key == "temp" or key == "soc":
-                    value   = self.average(value)
-                elif key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
-                    value   = self.average(value, 2) * 48 
+                if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
+                    val   = self.average(value, 2) * 48 
                 elif key == "mins_remaining":
-                    value   = self.average(value, 0)
+                    val   = self.average(value, 0)
+                else:
+                    val   = self.average(value, 1)
 
-                sensors.MqqtToHa.send_value(name, value)
+                if val > -99:
+                    sensors.MqqtToHa.send_value(name, val)
                 
                 # reset the values  
                 self.avg_values[key] = []  
@@ -117,8 +121,6 @@ class AnyDevice(gatt.Device):
             "full_charge_volt": "e6",
             "zero_charge_volt": "e7",
         }
-        
-        battery_capacity_ah = 400 # Ah
 
         params_keys         = list(params.keys())
         params_values       = list(params.values())
@@ -163,7 +165,9 @@ class AnyDevice(gatt.Device):
 
             val_int = int(value)                
             if key == "voltage":
-                values[key] = val_int / 100                
+                voltage   = val_int / 100 
+                if voltage > 40:
+                    values[key] = voltage               
             elif key == "current":
                 values[key] = val_int / 100
                 
@@ -192,7 +196,9 @@ class AnyDevice(gatt.Device):
             elif key == "temp":
                 temp    = val_int - 100
                 print(f"Temp = {temp}")
-                values[key] = temp
+
+                if temp > 10:
+                    values[key] = temp
             elif key == "accum_charge_cap":
                 values[key] = val_int / 1000    
               
@@ -200,13 +206,9 @@ class AnyDevice(gatt.Device):
             self.add_to_average(key, values[key])
 
         # Calculate percentage
-        if isinstance(battery_capacity_ah, int) and "ah_remaining" in values:
+        if "ah_remaining" in values:
             values["soc"] = values["ah_remaining"] / battery_capacity_ah * 100
             self.add_to_average("soc", values["soc"])
-
-        # Append max capacity
-        values["max_capacity"] = battery_capacity_ah * 48
-        self.add_to_average("max_capacity", values["max_capacity"])
 
         # Now it should be formatted corrected, in a dictionary
         if debug:
