@@ -29,30 +29,46 @@ class MqqtToHa:
     def create_sensors(self):
         print('Creating Sensors')
 
-        for sensor in self.sensors.values():
-            print(sensor)
+        
+        device_id       = self.device['identifiers'][0]
+        device_name     = self.device['name'].lower().replace(" ", "_")
 
-            base_topic      = "homeassistant/sensor/" + self.device['identifiers'][0] + '/' + sensor['name'].replace(' ', '_').lower()
-            unique_id       = (self.device['name'] + '_' + sensor['name']).lower().replace(" ", "_")
+        for index,sensor in self.sensors.items():
+            if 'sensortype' in sensor:
+                sensortype = sensor['sensortype']
+            else:
+                sensortype  = 'sensor'
 
-            print("Creating sensor '" + sensor['name'] + "' with unique id " + unique_id)
+            sensor_name                         = sensor['name'].replace(' ', '_').lower()
+            self.sensors[index]['base_topic']   = f"homeassistant/{sensortype}/{device_id}/{sensor_name}"
+            unique_id                           = f"{device_name}_{sensor_name}"
+
+            print(f"Creating sensor '{sensor_name}' with unique id {unique_id}")
 
             config_payload  = {
                 "name": sensor['name'],
-                "state_topic": base_topic + "/state",
-                "state_class": sensor['state'],
-                "unit_of_measurement": sensor['unit'],
-                "device_class": sensor['type'],
+                "state_topic": sensor['base_topic'] + "/state",
                 "unique_id": unique_id,
                 "device": self.device,
-                #"icon": sensor['icon'],
                 "platform": "mqtt"
             }
 
-            payload = json.dumps(config_payload)
+            if 'state' in sensor:
+                config_payload["state_class"]           = sensor['state']
+            
+            if 'unit' in sensor:
+                config_payload["unit_of_measurement"]   = sensor['unit']
+
+            if 'type' in sensor:
+                config_payload["device_class"]          = sensor['type']
+
+            if 'icon' in sensor:
+                config_payload["icon"]                  = sensor['icon']
+
+            payload                                     = json.dumps(config_payload)
 
             # Send
-            result  = self.client.publish(topic=base_topic + "/config", payload=payload, qos=1, retain=False)
+            result  = self.client.publish(topic=self.sensors[index]['base_topic'] + "/config", payload=payload, qos=1, retain=False)
 
             # Store
             self.sent[result.mid]    = payload
@@ -77,7 +93,7 @@ class MqqtToHa:
 
     def on_message(self, client, userdata, message):
         if( '$SYS/' not in message.topic):
-            print(message.topic+" "+str(message.payload.decode()) + userdata)
+            print(message.topic + " " + str(message.payload.decode()) + userdata)
 
     def on_log(self, client, userdata, paho_log_level, message):
         if paho_log_level == mqtt.LogLevel.MQTT_LOG_ERR:
@@ -115,7 +131,6 @@ class MqqtToHa:
         self.client.on_log       = self.on_log
         self.client.on_publish   = self.on_publish
 
-        
         print('Connecting to Home Assistant')
         self.client.connect(mqtt_host, mqtt_port)
 
