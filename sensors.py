@@ -61,14 +61,6 @@ sensors = {
         "type": "DURATION",
         #"icon": "mdi:thermometer"
     },
-    'max_capacity': {
-        "name": "Capacity",
-        "state": "measurement",
-        "unit": "kWh",
-        "type": "ENERGY_STORAGE",
-        #"icon": "mdi:thermometer",
-        "init": 400 * 48
-    },
     'accum_charge_cap': {
         "name": "Accumulated Charged Load",
         "state": "measurement",
