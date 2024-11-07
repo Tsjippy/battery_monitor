@@ -90,6 +90,9 @@ class AnyDevice(gatt.Device):
             print(self.avg_values) 
             
             for key, value in self.avg_values.items():
+                if not key in sensors.sensors:
+                    continue
+                
                 name    = sensors.sensors[key]['name']
 
                 if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
