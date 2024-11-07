@@ -2,13 +2,9 @@
 from struct import *
 import paho.mqtt.client as mqtt
 import json
+from mqtt_secrets import *
 #from paho.mqtt.enums import MQTTProtocolVersion
 #from paho.mqtt.enums import CallbackAPIVersion
-
-mqtt_username   = "ewaldharmsen"
-mqtt_password   = "3e9mKWoP10ZRw05jfugK"
-mqtt_host       = "192.168.0.200"
-mqtt_port       = 1883
 
 class MqqtToHa:
     def __init__(self, device, sensors):
@@ -28,7 +24,6 @@ class MqqtToHa:
 
     def create_sensors(self):
         print('Creating Sensors')
-
         
         device_id       = self.device['identifiers'][0]
         device_name     = self.device['name'].lower().replace(" ", "_")
