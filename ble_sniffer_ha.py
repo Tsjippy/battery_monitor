@@ -96,7 +96,7 @@ class AnyDevice(gatt.Device):
                 name    = sensors.sensors[key]['name']
 
                 if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
-                    val   = self.average(value, 2) * 48 
+                    val   = self.average(value * 48 , 2)
                 elif key == "mins_remaining":
                     val   = self.average(value, 0)
                 else:
