@@ -5,8 +5,6 @@ import time
 from datetime import datetime, timezone
 import shared
 import sensors
-import pytz
-import datetime as dt
 
 updateInterval      = 10 #in seconds
 debug               = False

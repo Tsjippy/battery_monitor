@@ -3,6 +3,9 @@ from struct import *
 import paho.mqtt.client as mqtt
 import json
 from mqtt_secrets import *
+
+print(mqtt_client_id)
+print(mqtt_host)
 #from paho.mqtt.enums import MQTTProtocolVersion
 #from paho.mqtt.enums import CallbackAPIVersion
 import time
