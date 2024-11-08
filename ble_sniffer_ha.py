@@ -3,7 +3,6 @@
 import gatt
 import time
 from datetime import datetime, timezone
-import signal
 import sys
 
 import sensors
@@ -128,7 +127,7 @@ class AnyDevice(gatt.Device):
                 self.avg_values[key] = []  
 
             self.logger.log_message(datetime.now(timezone.utc))
-            sensors.MqqtToHa.send_value('last_message', str(datetime.now(timezone.utc).isoformat()))
+            sensors.MqqtToHa.send_value('last_message', str(datetime.now(datetime.now().astimezone().tzinfo).isoformat("T", "seconds")))
 
             self.updating        = False
                 
