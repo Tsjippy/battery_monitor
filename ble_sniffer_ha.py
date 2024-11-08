@@ -127,11 +127,13 @@ class AnyDevice(gatt.Device):
                 # reset the values  
                 self.avg_values[key] = []  
 
+            # https://www.home-assistant.io/docs/configuration/templating/#time
+            # 2023-07-30T20:03:49.253717+00:00
             timestring  = str(datetime.now(datetime.now().astimezone().tzinfo).isoformat())
             if debug:
                 self.logger.log_message(f"Sending time: {timestring}") 
-                
-            sensors.MqqtToHa.send_value('last_message', timestring)
+
+            sensors.MqqtToHa.send_value('last_message', timestring, False)
 
             self.updating        = False
                 

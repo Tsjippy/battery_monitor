@@ -124,10 +124,14 @@ class MqqtToHa:
         del self.sent[mid]
 
     # Sends a sensor value
-    def send_value(self, name, value):
+    def send_value(self, name, value, send_json=True):
         topic                   = "homeassistant/sensor/" + self.device['identifiers'][0] + '/' + name.replace(' ', '_').lower() + "/state"
-        payload                 = json.dumps(value)
 
+        if send_json:
+            payload                 = json.dumps(value)
+        else:
+            payload                 = value
+            
         # add current messgae to the queue
         self.queue[topic]   = payload
 
