@@ -105,7 +105,8 @@ class AnyDevice(gatt.Device):
 
             self.last_dom_update = int(time.time())
             
-            self.logger.log_message(self.avg_values) 
+            if debug:
+                self.logger.log_message(self.avg_values) 
             
             for key, value in self.avg_values.items():
                 if not key in sensors.sensors:
@@ -126,6 +127,7 @@ class AnyDevice(gatt.Device):
                 # reset the values  
                 self.avg_values[key] = []  
 
+            self.logger.log_message(datetime.now(timezone.utc))
             sensors.MqqtToHa.send_value('last_message', str(datetime.now(timezone.utc).isoformat()))
 
             self.updating        = False
@@ -281,7 +283,7 @@ def connect():
                 try:
                     device = AnyDevice(mac_address=mac, manager=manager)
                 except Exception as e:
-                    lgr.log_message(e, 'error')
+                    lgr.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
                     
                     lgr.log_message("Trying again, terminate with Ctrl+C")
                     connect()
@@ -290,9 +292,6 @@ def connect():
         
 connect()
 
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
-
 if MAC_ADDRESS:
     lgr.log_message("Terminate with Ctrl+C")
 
@@ -300,13 +299,14 @@ if MAC_ADDRESS:
         manager.run()
     except KeyboardInterrupt:
         lgr.log_message("Terminating")
-    except ProgramKilled:
         sensors.MqqtToHa.logger.log_message('Program killed: running cleanup code')
         sensors.MqqtToHa.client.publish(f'system-sensors/sensor/{sensors.MqqtToHa.device_name}/availability', 'offline', retain=True)
         sensors.MqqtToHa.client.disconnect()
         sensors.MqqtToHa.client.loop_stop()
         sys.stdout.flush()
         lgr.log_message("Succesfully terminated")
+    except Exception as e:
+        lgr.log_message(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
 
     for dev in manager.devices():
         dev.disconnect()
