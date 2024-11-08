@@ -15,7 +15,7 @@ class MqqtToHa:
         self.device         = device
         self.sensors        = sensors
 
-        self.logger         = logger.Logger()
+        self.logger         = logger.Logger('error')
 
         #Store send commands till they are received
         self.sent           = {}
@@ -131,7 +131,7 @@ class MqqtToHa:
             payload                 = json.dumps(value)
         else:
             payload                 = value
-            
+
         # add current messgae to the queue
         self.queue[topic]   = payload
 

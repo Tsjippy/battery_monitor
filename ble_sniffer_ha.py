@@ -8,14 +8,8 @@ import sys
 import sensors
 import logger
 
-class ProgramKilled(Exception):
-    pass
-
-def signal_handler(signum, frame):
-    raise ProgramKilled
-
 updateInterval      = 10 #in seconds
-debug               = True
+debug               = False
 NOTIFY_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb'
 MAC_ADDRESS         = '38:3b:26:79:6f:c5'
 battery_capacity_ah = 400 # Ah      
@@ -32,7 +26,7 @@ class AnyDevice(gatt.Device):
         self.last_dom_update    = int(time.time())  
         self.updating           = False 
         self.avg_values         = {}
-        self.logger             = logger.Logger()
+        self.logger             = logger.Logger('error')
     
     def connect_succeeded(self):
         super().connect_succeeded()
