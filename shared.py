@@ -110,7 +110,7 @@ class MqqtToHa:
 
     def on_message(self, client, userdata, message):
         if( '$SYS/' not in message.topic):
-            self.logger.log_message(message.topic + " " + str(message.payload.decode()) + userdata)
+            self.logger.log_message(str(message.topic) + " " + str(message.payload.decode()) + str(userdata))
 
     def on_log(self, client, userdata, paho_log_level, message):
         if paho_log_level == mqtt.LogLevel.MQTT_LOG_ERR:
