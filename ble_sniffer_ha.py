@@ -3,9 +3,17 @@
 import gatt
 import time
 from datetime import datetime, timezone
-import shared
+import signal
+import sys
+
 import sensors
 import logger
+
+class ProgramKilled(Exception):
+    pass
+
+def signal_handler(signum, frame):
+    raise ProgramKilled
 
 updateInterval      = 10 #in seconds
 debug               = False
@@ -280,16 +288,26 @@ def connect():
         
 connect()
 
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
 if MAC_ADDRESS:
     lgr.log_message("Terminate with Ctrl+C")
 
     try:
         manager.run()
     except KeyboardInterrupt:
-        pass
+        lgr.log_message("Terminating")
+    except ProgramKilled:
+        sensors.MqqtToHa.logger.log_message('Program killed: running cleanup code')
+        sensors.MqqtToHa.client.publish(f'system-sensors/sensor/{sensors.MqqtToHa.device_name}/availability', 'offline', retain=True)
+        sensors.MqqtToHa.client.disconnect()
+        sensors.MqqtToHa.client.loop_stop()
+        sys.stdout.flush()
+        lgr.log_message("Succesfully terminated")
 
     for dev in manager.devices():
         dev.disconnect()
 else:
     lgr.log_message("Choose a mac address from the list and enter it into ble_config.ini")
-
+            

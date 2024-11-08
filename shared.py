@@ -8,15 +8,7 @@ import logger
 #from paho.mqtt.enums import MQTTProtocolVersion
 #from paho.mqtt.enums import CallbackAPIVersion
 import time
-import sys
 import importlib.metadata
-import signal
-
-class ProgramKilled(Exception):
-    pass
-
-def signal_handler(signum, frame):
-    raise ProgramKilled
 
 class MqqtToHa:
     def __init__(self, device, sensors):
@@ -176,18 +168,3 @@ class MqqtToHa:
                 time.sleep(600)
         
         self.client.loop_start()
-
-        while True:
-            try:
-                sys.stdout.flush()
-                time.sleep(1)
-            except ProgramKilled:
-                self.logger.log_message('Program killed: running cleanup code')
-                self.client.publish(f'system-sensors/sensor/{self.device_name}/availability', 'offline', retain=True)
-                self.client.disconnect()
-                self.client.loop_stop()
-                sys.stdout.flush()
-                break
-
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
