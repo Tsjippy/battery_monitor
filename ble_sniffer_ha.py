@@ -15,7 +15,7 @@ def signal_handler(signum, frame):
     raise ProgramKilled
 
 updateInterval      = 10 #in seconds
-debug               = False
+debug               = True
 NOTIFY_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb'
 MAC_ADDRESS         = '38:3b:26:79:6f:c5'
 battery_capacity_ah = 400 # Ah      
@@ -75,7 +75,8 @@ class AnyDevice(gatt.Device):
         self.on_data_received(value)
 
     def on_data_received(self, value):
-        #self.logger.log_message(f"Got packet of len(value)={len(value)}: {value.hex()}")
+        if debug:
+            self.logger.log_message(f"Got packet of len(value)={len(value)}: {value.hex()}")
         self.process_data(value.hex())
         
     def add_to_average(self, key, value):
@@ -280,6 +281,7 @@ def connect():
 
                 try:
                     device = AnyDevice(mac_address=mac, manager=manager)
+                    lgr.log_message("Connected!")
                 except Exception as e:
                     lgr.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
                     
