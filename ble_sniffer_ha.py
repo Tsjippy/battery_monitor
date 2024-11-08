@@ -126,7 +126,6 @@ class AnyDevice(gatt.Device):
                 # reset the values  
                 self.avg_values[key] = []  
 
-            self.logger.log_message(datetime.now(timezone.utc))
             sensors.MqqtToHa.send_value('last_message', str(datetime.now(datetime.now().astimezone().tzinfo).isoformat("T", "seconds")))
 
             self.updating        = False
