@@ -5,6 +5,17 @@ import json
 from mqtt_secrets import *
 #from paho.mqtt.enums import MQTTProtocolVersion
 #from paho.mqtt.enums import CallbackAPIVersion
+import time
+import sys
+import importlib.metadata
+import signal
+import datetime as dt
+
+class ProgramKilled(Exception):
+    pass
+
+def signal_handler(signum, frame):
+    raise ProgramKilled
 
 class MqqtToHa:
     def __init__(self, device, sensors):
@@ -14,8 +25,21 @@ class MqqtToHa:
         #Store send commands till they are received
         self.sent           = {}
         self.queue          = {}
-        self.client         = mqtt.Client()
+
+        # https://eclipse.dev/paho/files/paho.mqtt.python/html/migrations.html
+        # note that with version1, mqttv3 is used and no other migration is made
+        # if paho-mqtt v1.6.x gets removed, a full code migration must be made
+        if importlib.metadata.version("paho-mqtt")[0] == '1':
+            # for paho 1.x clients
+            self.client = mqtt.Client(client_id=mqtt_client_id)
+        else:
+            # for paho 2.x clients
+            # note that a deprecation warning gets logged 
+            self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=mqtt_client_id)
+
         self.connected      = False
+
+        self.device_name    = self.device['name'].lower().replace(" ", "_")
 
         self.main()
 
@@ -26,7 +50,7 @@ class MqqtToHa:
         print('Creating Sensors')
         
         device_id       = self.device['identifiers'][0]
-        device_name     = self.device['name'].lower().replace(" ", "_")
+        
 
         for index,sensor in self.sensors.items():
             if 'sensortype' in sensor:
@@ -36,7 +60,7 @@ class MqqtToHa:
 
             sensor_name                         = sensor['name'].replace(' ', '_').lower()
             self.sensors[index]['base_topic']   = f"homeassistant/{sensortype}/{device_id}/{sensor_name}"
-            unique_id                           = f"{device_name}_{sensor_name}"
+            unique_id                           = f"{self.device_name}_{sensor_name}"
 
             print(f"Creating sensor '{sensor_name}' with unique id {unique_id}")
 
@@ -125,8 +149,38 @@ class MqqtToHa:
         self.client.on_message   = self.on_message
         self.client.on_log       = self.on_log
         self.client.on_publish   = self.on_publish
+        self.client.will_set(f'system-sensors/sensor/{self.device_name}/availability', 'offline', retain=True)
 
         print('Connecting to Home Assistant')
-        self.client.connect(mqtt_host, mqtt_port)
 
+        while True:
+            try:
+                self.client.connect(mqtt_host, mqtt_port)
+                break
+            except ConnectionRefusedError:
+                # sleep for 2 minutes if broker is unavailable and retry.
+                # Make this value configurable?
+                # this feels like a dirty hack. Is there some other way to do this?
+                time.sleep(120)
+            except OSError:
+                # sleep for 10 minutes if broker is not reachable, i.e. network is down
+                # Make this value configurable?
+                # this feels like a dirty hack. Is there some other way to do this?
+                time.sleep(600)
+        
         self.client.loop_start()
+
+        while True:
+            try:
+                sys.stdout.flush()
+                time.sleep(1)
+            except ProgramKilled:
+                print('Program killed: running cleanup code')
+                self.client.publish(f'system-sensors/sensor/{self.device_name}/availability', 'offline', retain=True)
+                self.client.disconnect()
+                self.client.loop_stop()
+                sys.stdout.flush()
+                break
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)

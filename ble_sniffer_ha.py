@@ -17,8 +17,9 @@ class AnyDeviceManager(gatt.DeviceManager):
 
 class AnyDevice(gatt.Device):
     charging        = False
-    last_dom_update = int(time.time())   
-    avg_values      = {}   
+    last_dom_update = int(time.time())  
+    updating        = False 
+    avg_values      = {}
     
     def connect_succeeded(self):
         super().connect_succeeded()
@@ -84,7 +85,10 @@ class AnyDevice(gatt.Device):
         if debug:
             print("Time to ha update: "+ str(updateInterval - (int( time.time()) - self.last_dom_update)))
             
-        if((int( time.time()) - self.last_dom_update) > updateInterval):
+        if((int( time.time()) - self.last_dom_update) > updateInterval and not self.updating):
+            # set to True to prevent it to run a new update before the previous one is finished
+            self.updating        = True
+
             self.last_dom_update = int(time.time())
             
             print(self.avg_values) 
@@ -107,6 +111,8 @@ class AnyDevice(gatt.Device):
                 
                 # reset the values  
                 self.avg_values[key] = []  
+
+            self.updating        = False
                 
     def process_data(self, data):
         params = {
@@ -219,6 +225,7 @@ class AnyDevice(gatt.Device):
         
         # send to home assistant every minute            
         self.send_to_ha()  
+
                     
 manager = gatt.DeviceManager(adapter_name='hci0')
 
