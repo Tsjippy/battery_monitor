@@ -26,12 +26,11 @@ class AnyDeviceManager(gatt.DeviceManager):
         self.logger.log_message("Discovered [%s] %s" % (device.mac_address, device.alias()))
 
 class AnyDevice(gatt.Device):
-    def __init__(self):
-        self.charging           = False
-        self.last_dom_update    = int(time.time())  
-        self.updating           = False 
-        self.avg_values         = {}
-        self.logger             = logger.Logger()
+    charging           = False
+    last_dom_update    = int(time.time())  
+    updating           = False 
+    avg_values         = {}
+    logger             = logger.Logger()
     
     def connect_succeeded(self):
         super().connect_succeeded()
