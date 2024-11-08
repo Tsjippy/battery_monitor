@@ -9,7 +9,6 @@ import time
 import sys
 import importlib.metadata
 import signal
-import datetime as dt
 
 class ProgramKilled(Exception):
     pass

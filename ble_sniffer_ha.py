@@ -2,14 +2,17 @@
 
 import gatt
 import time
+from datetime import datetime, timezone
 import shared
 import sensors
+import pytz
+import datetime as dt
 
 updateInterval      = 10 #in seconds
 debug               = False
 NOTIFY_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb'
 MAC_ADDRESS         = '38:3b:26:79:6f:c5'
-battery_capacity_ah = 400 # Ah
+battery_capacity_ah = 400 # Ah      
 
 class AnyDeviceManager(gatt.DeviceManager):
     def device_discovered(self, device):
@@ -111,6 +114,8 @@ class AnyDevice(gatt.Device):
                 
                 # reset the values  
                 self.avg_values[key] = []  
+
+            sensors.MqqtToHa.send_value('last_message', str(datetime.now(timezone.utc).isoformat()))
 
             self.updating        = False
                 

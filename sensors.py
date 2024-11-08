@@ -81,7 +81,13 @@ sensors = {
         "unit": "kWh",
         "type": "ENERGY_STORAGE",
         #"icon": "mdi:thermometer"
-    }
+    },
+    'last_message': {
+        'name': 'Last Message',
+        "state": "measurement",
+        'type': 'timestamp',
+        'icon': 'mdi:clock-check'
+    },
 }
 
 MqqtToHa    = shared.MqqtToHa(device, sensors)
