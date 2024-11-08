@@ -3,9 +3,8 @@ from struct import *
 import paho.mqtt.client as mqtt
 import json
 from mqtt_secrets import *
+import logger
 
-print(mqtt_client_id)
-print(mqtt_host)
 #from paho.mqtt.enums import MQTTProtocolVersion
 #from paho.mqtt.enums import CallbackAPIVersion
 import time
@@ -23,6 +22,8 @@ class MqqtToHa:
     def __init__(self, device, sensors):
         self.device         = device
         self.sensors        = sensors
+
+        self.logger         = logger.Logger()
 
         #Store send commands till they are received
         self.sent           = {}
@@ -49,7 +50,7 @@ class MqqtToHa:
         return f"{self.device.name}"
 
     def create_sensors(self):
-        print('Creating Sensors')
+        self.logger.log_message('Creating Sensors')
         
         device_id       = self.device['identifiers'][0]
         
@@ -64,7 +65,7 @@ class MqqtToHa:
             self.sensors[index]['base_topic']   = f"homeassistant/{sensortype}/{device_id}/{sensor_name}"
             unique_id                           = f"{self.device_name}_{sensor_name}"
 
-            print(f"Creating sensor '{sensor_name}' with unique id {unique_id}")
+            self.logger.log_message(f"Creating sensor '{sensor_name}' with unique id {unique_id}")
 
             config_payload  = {
                 "name": sensor['name'],
@@ -98,7 +99,10 @@ class MqqtToHa:
                 self.send_value(sensor['name'], sensor['init'])
 
     def on_connect(self, client, userdata, flags, reason_code):
-        print(f"Connected with result code {reason_code}")
+        if reason_code == 0:
+            self.logger.log_message(f"Succesfuly connected")
+        else:
+            self.logger.log_message(f"Connected with result code {reason_code}", 'error')
 
         self.connected  = True
 
@@ -110,19 +114,19 @@ class MqqtToHa:
 
         self.create_sensors()
 
-        print('Sensors created')
+        self.logger.log_message('Sensors created')
 
     def on_message(self, client, userdata, message):
         if( '$SYS/' not in message.topic):
-            print(message.topic + " " + str(message.payload.decode()) + userdata)
+            self.logger.log_message(message.topic + " " + str(message.payload.decode()) + userdata)
 
     def on_log(self, client, userdata, paho_log_level, message):
         if paho_log_level == mqtt.LogLevel.MQTT_LOG_ERR:
-            print(message)
+            self.logger.log_message(message)
 
     # Called when the server received our publish succesfully
     def on_publish(self, client, userdata, mid, reason_code='', properties=''):
-        #print(send[mid] )
+        #self.logger.log_message(send[mid] )
 
         #Remove from send dict
         del self.sent[mid]
@@ -136,7 +140,7 @@ class MqqtToHa:
         self.queue[topic]   = payload
 
         if not self.connected:
-            print('Not connected, adding to queue')
+            self.logger.log_message('Not connected, adding to queue', 'warning')
         else:
             # post queued messages
             for topic, payload in self.queue.items():
@@ -144,7 +148,8 @@ class MqqtToHa:
                 self.sent[result.mid]   = payload
 
     def main(self):
-        print('Starting application')
+        self.logger.log_message('Starting application')
+
         #client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.username_pw_set(mqtt_username, mqtt_password)
         self.client.on_connect   = self.on_connect
@@ -153,7 +158,7 @@ class MqqtToHa:
         self.client.on_publish   = self.on_publish
         self.client.will_set(f'system-sensors/sensor/{self.device_name}/availability', 'offline', retain=True)
 
-        print('Connecting to Home Assistant')
+        self.logger.log_message('Connecting to Home Assistant')
 
         while True:
             try:
@@ -177,7 +182,7 @@ class MqqtToHa:
                 sys.stdout.flush()
                 time.sleep(1)
             except ProgramKilled:
-                print('Program killed: running cleanup code')
+                self.logger.log_message('Program killed: running cleanup code')
                 self.client.publish(f'system-sensors/sensor/{self.device_name}/availability', 'offline', retain=True)
                 self.client.disconnect()
                 self.client.loop_stop()

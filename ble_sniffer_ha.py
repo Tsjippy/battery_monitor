@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone
 import shared
 import sensors
+import logger
 
 updateInterval      = 10 #in seconds
 debug               = False
@@ -14,56 +15,58 @@ battery_capacity_ah = 400 # Ah
 
 class AnyDeviceManager(gatt.DeviceManager):
     def device_discovered(self, device):
-        print("Discovered [%s] %s" % (device.mac_address, device.alias()))
+        self.logger.log_message("Discovered [%s] %s" % (device.mac_address, device.alias()))
 
 class AnyDevice(gatt.Device):
-    charging        = False
-    last_dom_update = int(time.time())  
-    updating        = False 
-    avg_values      = {}
+    def __init__(self):
+        self.charging           = False
+        self.last_dom_update    = int(time.time())  
+        self.updating           = False 
+        self.avg_values         = {}
+        self.logger             = logger.Logger()
     
     def connect_succeeded(self):
         super().connect_succeeded()
-        print("[%s] Connected" % (self.mac_address))
+        self.logger.log_message("[%s] Connected" % (self.mac_address))
 
     def connect_failed(self, error):
         super().connect_failed(error)
-        print("[%s] Connection failed: %s" % (self.mac_address, str(error)))
+        self.logger.log_message("[%s] Connection failed: %s" % (self.mac_address, str(error)), 'error')
         # Try to connect again
         #connect()
 
     def disconnect_succeeded(self):
         super().disconnect_succeeded()
-        print("[%s] Disconnected" % (self.mac_address))
-        print("[%s] Reconnecting in 10 seconds" % (self.mac_address))
+        self.logger.log_message("[%s] Disconnected" % (self.mac_address), 'warning')
+        self.logger.log_message("[%s] Reconnecting in 10 seconds" % (self.mac_address), 'warning')
         time.sleep(10)
         self.connect()
 
     def services_resolved(self):
         super().services_resolved()
 
-        print("[%s] Resolved services" % (self.mac_address))
+        self.logger.log_message("[%s] Resolved services" % (self.mac_address))
         for service in self.services:
-            print("[%s]  Service [%s]" % (self.mac_address, service.uuid))
+            self.logger.log_message("[%s]  Service [%s]" % (self.mac_address, service.uuid))
             for characteristic in service.characteristics:
                 if not NOTIFY_CHAR_UUID:
-                    print("[%s]    Characteristic [%s]" % (self.mac_address, characteristic.uuid))
+                    self.logger.log_message("[%s]    Characteristic [%s]" % (self.mac_address, characteristic.uuid))
                 elif characteristic.uuid == NOTIFY_CHAR_UUID:
-                    print("[%s]    Enabling Notifications for Characteristic [%s]" % (self.mac_address, characteristic.uuid))
+                    self.logger.log_message("[%s]    Enabling Notifications for Characteristic [%s]" % (self.mac_address, characteristic.uuid))
                     characteristic.enable_notifications()
 
     def characteristic_enable_notifications_succeeded(self, characteristic):
-        print('characteristic_enable_notifications_succeeded')
+        self.logger.log_message('characteristic_enable_notifications_succeeded')
 
     def characteristic_enable_notifications_failed(self, characteristic, error):
-        print('characteristic_enable_notifications_failed')
+        self.logger.log_message('characteristic_enable_notifications_failed', 'error')
 
     def characteristic_value_updated(self, characteristic, value):
         super().characteristic_value_updated(characteristic, value)
         self.on_data_received(value)
 
     def on_data_received(self, value):
-        #print(f"Got packet of len(value)={len(value)}: {value.hex()}")
+        #self.logger.log_message(f"Got packet of len(value)={len(value)}: {value.hex()}")
         self.process_data(value.hex())
         
     def add_to_average(self, key, value):
@@ -75,7 +78,7 @@ class AnyDevice(gatt.Device):
             
     def average(self, lst, decimals=1): 
         if debug:
-            print(lst)
+            self.logger.log_message(lst)
             
         if len(lst)  == 0:
             return -99
@@ -84,7 +87,7 @@ class AnyDevice(gatt.Device):
         
     def send_to_ha(self):
         if debug:
-            print("Time to ha update: "+ str(updateInterval - (int( time.time()) - self.last_dom_update)))
+            self.logger.log_message("Time to ha update: "+ str(updateInterval - (int( time.time()) - self.last_dom_update)))
             
         if((int( time.time()) - self.last_dom_update) > updateInterval and not self.updating):
             # set to True to prevent it to run a new update before the previous one is finished
@@ -92,7 +95,7 @@ class AnyDevice(gatt.Device):
 
             self.last_dom_update = int(time.time())
             
-            print(self.avg_values) 
+            self.logger.log_message(self.avg_values) 
             
             for key, value in self.avg_values.items():
                 if not key in sensors.sensors:
@@ -165,10 +168,9 @@ class AnyDevice(gatt.Device):
                 
         if debug:
             if not values: 
-                print("Nothing found for "+str(data))
-                shared.send_ha_message("Nothing found for "+str(data))
+                self.logger.log_message(f"Nothing found for {data}")
             else:
-                print(values)
+                self.logger.log_message(values)
 
         # now format to the correct decimal place, or perform other formatting
         for key,value in list(values.items()):
@@ -207,7 +209,7 @@ class AnyDevice(gatt.Device):
                     values["power"] *= -1
             elif key == "temp":
                 temp    = val_int - 100
-                print(f"Temp = {temp}")
+                self.logger.log_message(f"Temp = {temp}")
 
                 if temp > 10:
                     values[key] = temp
@@ -224,17 +226,18 @@ class AnyDevice(gatt.Device):
 
         # Now it should be formatted corrected, in a dictionary
         if debug:
-            print(values) 
+            self.logger.log_message(values) 
         
         # send to home assistant every minute            
         self.send_to_ha()  
 
-                    
 manager = gatt.DeviceManager(adapter_name='hci0')
+
+lgr = logger.Logger()
 
 # Run discovery
 manager.update_devices()
-print("Starting discovery...")
+lgr.log_message("Starting discovery...")
 # scan all the advertisements from the services list
 manager.start_discovery()
 discovering = True
@@ -244,7 +247,7 @@ found = []
 while discovering:
     time.sleep(1)
     f = len(manager.devices())
-    print("Found {} BLE-devices so far".format(f))
+    lgr.log_message("Found {} BLE-devices so far".format(f))
     found.append(f)
     if len(found) > 5:
         if found[len(found) - 5] == f:
@@ -255,21 +258,22 @@ while discovering:
         discovering = False
 
 manager.stop_discovery()
-print("Found {} BLE-devices".format(len(manager.devices())))
+lgr.log_message("Found {} BLE-devices".format(len(manager.devices())))
 
 def connect():
     for dev in manager.devices():
-        print("Processing device {} {}".format(dev.mac_address, dev.alias()))
+        lgr.log_message("Processing device {} {}".format(dev.mac_address, dev.alias()))
         if MAC_ADDRESS:
             mac = MAC_ADDRESS.lower()
             if dev.mac_address.lower() == mac:
-                print("Trying to connect to {}...".format(dev.mac_address))
+                lgr.log_message("Trying to connect to {}...".format(dev.mac_address))
+
                 try:
                     device = AnyDevice(mac_address=mac, manager=manager)
                 except Exception as e:
-                    print(e)
+                    lgr.log_message(e, 'error')
                     
-                    print("Trying again, terminate with Ctrl+C")
+                    lgr.log_message("Trying again, terminate with Ctrl+C")
                     connect()
 
                 device.connect()
@@ -277,7 +281,7 @@ def connect():
 connect()
 
 if MAC_ADDRESS:
-    print("Terminate with Ctrl+C")
+    lgr.log_message("Terminate with Ctrl+C")
 
     try:
         manager.run()
@@ -287,5 +291,5 @@ if MAC_ADDRESS:
     for dev in manager.devices():
         dev.disconnect()
 else:
-    print("Choose a mac address from the list and enter it into ble_config.ini")
+    lgr.log_message("Choose a mac address from the list and enter it into ble_config.ini")
 
