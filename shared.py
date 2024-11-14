@@ -15,7 +15,7 @@ class MqqtToHa:
         self.device         = device
         self.sensors        = sensors
 
-        self.logger         = logger.Logger('error')
+        self.logger         = logger.Logger('info')
 
         #Store send commands till they are received
         self.sent           = {}

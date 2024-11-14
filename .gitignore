@@ -25,3 +25,5 @@ node_modules/
 **/package-lock.json
 secrets.js
 mqtt_secrets.py
+
+*pycache*
