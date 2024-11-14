@@ -192,39 +192,39 @@ class AnyDevice(gatt.Device):
                 if not value.isdigit():
                     del values[key]
 
-            val_int = int(value)                
-            if key == "voltage":
-                voltage   = val_int / 100 
-                if voltage > 40:
-                    values[key] = voltage               
-            elif key == "current":
-                values[key] = val_int / 100
-                
-                if self.charging == False:
-                    values["current"] *= -1
-            elif key == "discharge":
-                values[key] = val_int / 100000
-                self.charging = False
-            elif key == "charge":
-                values[key] = val_int / 100000
-                self.charging = True
-            elif key == "dir_of_current":
-                if value == "01":
-                    self.charging = True
-                else:
+                val_int = int(value)                
+                if key == "voltage":
+                    voltage   = val_int / 100 
+                    if voltage > 40:
+                        values[key] = voltage               
+                elif key == "current":
+                    values[key] = val_int / 100
+                    
+                    if self.charging == False:
+                        values["current"] *= -1
+                elif key == "discharge":
+                    values[key] = val_int / 100000
                     self.charging = False
-            elif key == "ah_remaining":
-                values[key] = val_int / 1000
-            elif key == "mins_remaining":
-                values[key] = val_int
-            elif key == "power":
-                values[key] = val_int / 100
-                
-                if self.charging == False:
-                    values["power"] *= -1
-            elif key == "temp":
-                temp    = val_int - 100
-                self.logger.log_message(f"Temp = {temp}")
+                elif key == "charge":
+                    values[key] = val_int / 100000
+                    self.charging = True
+                elif key == "dir_of_current":
+                    if value == "01":
+                        self.charging = True
+                    else:
+                        self.charging = False
+                elif key == "ah_remaining":
+                    values[key] = val_int / 1000
+                elif key == "mins_remaining":
+                    values[key] = val_int
+                elif key == "power":
+                    values[key] = val_int / 100
+                    
+                    if self.charging == False:
+                        values["power"] *= -1
+                elif key == "temp":
+                    temp    = val_int - 100
+                    self.logger.log_message(f"Temp = {temp}")
 
                     if temp > 10:
                         values[key] = temp
