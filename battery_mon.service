@@ -1,5 +1,5 @@
 [Unit]
-Description = Fetched battery data over bluetooth and sends it to domoticz
+Description = Fetched battery data over bluetooth and sends it to Home Assignment
 After = network.target
  
 [Service]
