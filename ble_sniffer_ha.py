@@ -26,7 +26,7 @@ class AnyDevice(gatt.Device):
         self.last_dom_update    = int(time.time())  
         self.updating           = False 
         self.avg_values         = {}
-        self.logger             = logger.Logger('error')
+        self.logger             = logger.Logger('info')
     
     def connect_succeeded(self):
         super().connect_succeeded()
@@ -90,103 +90,107 @@ class AnyDevice(gatt.Device):
         return round((sum(lst) / len(lst)) , decimals)
         
     def send_to_ha(self):
-        if debug:
-            self.logger.log_message("Time to ha update: "+ str(updateInterval - (int( time.time()) - self.last_dom_update)))
-            
-        if((int( time.time()) - self.last_dom_update) > updateInterval and not self.updating):
-            # set to True to prevent it to run a new update before the previous one is finished
-            self.updating        = True
-
-            self.last_dom_update = int(time.time())
-            
+        try:
             if debug:
-                self.logger.log_message(self.avg_values) 
-            
-            for key, value in self.avg_values.items():
-                if not key in sensors.sensors:
-                    continue
+                self.logger.log_message("Time to ha update: "+ str(updateInterval - (int( time.time()) - self.last_dom_update)))
                 
-                name    = sensors.sensors[key]['name']
+            if((int( time.time()) - self.last_dom_update) > updateInterval and not self.updating):
+                # set to True to prevent it to run a new update before the previous one is finished
+                self.updating        = True
 
-                if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
-                    val   = self.average(value * 48 , 2)
-                elif key == "mins_remaining":
-                    val   = self.average(value, 0)
-                else:
-                    val   = self.average(value, 1)
-
-                if val > -99:
-                    sensors.MqqtToHa.send_value(name, val)
+                self.last_dom_update = int(time.time())
                 
-                # reset the values  
-                self.avg_values[key] = []  
+                if debug:
+                    self.logger.log_message(self.avg_values) 
+                
+                for key, value in self.avg_values.items():
+                    if not key in sensors.sensors:
+                        continue
+                    
+                    name    = sensors.sensors[key]['name']
 
-            # https://www.home-assistant.io/docs/configuration/templating/#time
-            # 2023-07-30T20:03:49.253717+00:00
-            timestring  = str(datetime.now(datetime.now().astimezone().tzinfo).isoformat())
-            if debug:
-                self.logger.log_message(f"Sending time: {timestring}") 
+                    if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
+                        val   = self.average(value * 48 , 2)
+                    elif key == "mins_remaining":
+                        val   = self.average(value, 0)
+                    else:
+                        val   = self.average(value, 1)
 
-            sensors.MqqtToHa.send_value('last_message', timestring, False)
+                    if val > -99:
+                        sensors.MqqtToHa.send_value(name, val)
+                    
+                    # reset the values  
+                    self.avg_values[key] = []  
 
-            self.updating        = False
+                # https://www.home-assistant.io/docs/configuration/templating/#time
+                # 2023-07-30T20:03:49.253717+00:00
+                timestring  = str(datetime.now(datetime.now().astimezone().tzinfo).isoformat())
+                if debug:
+                    self.logger.log_message(f"Sending time: {timestring}") 
+
+                sensors.MqqtToHa.send_value('last_message', timestring, False)
+
+                self.updating        = False
+        except Exception as e:
+            self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
                 
     def process_data(self, data):
-        params = {
-            "voltage":          "c0",       
-            "current":          "c1",       # Amps
-            "cur_soc":          "d0",       # %
-            "dir_of_current":   "d1",   
-            "ah_remaining":     "d2",
-            "discharge":        "d3",		# todays total in kWh
-            "charge":           "d4",       # todays total in kWh
-            "accum_charge_cap": "d5",       # accumulated charging capacity Ah (/1000)
-            "mins_remaining":   "d6",
-            "power":            "d8",       # Watt
-            "temp":             "d9",       # C
-            "full_charge_volt": "e6",
-            "zero_charge_volt": "e7",
-        }
+        try:
+            params = {
+                "voltage":          "c0",       
+                "current":          "c1",       # Amps
+                "cur_soc":          "d0",       # %
+                "dir_of_current":   "d1",   
+                "ah_remaining":     "d2",
+                "discharge":        "d3",		# todays total in kWh
+                "charge":           "d4",       # todays total in kWh
+                "accum_charge_cap": "d5",       # accumulated charging capacity Ah (/1000)
+                "mins_remaining":   "d6",
+                "power":            "d8",       # Watt
+                "temp":             "d9",       # C
+                "full_charge_volt": "e6",
+                "zero_charge_volt": "e7",
+            }
 
-        params_keys         = list(params.keys())
-        params_values       = list(params.values())
+            params_keys         = list(params.keys())
+            params_values       = list(params.values())
 
-        # split bs into a list of all values and hex keys
-        bs_list             = [data[i:i+2] for i in range(0, len(data), 2)]
+            # split bs into a list of all values and hex keys
+            bs_list             = [data[i:i+2] for i in range(0, len(data), 2)]
 
-        # reverse the list so that values come after hex params
-        bs_list_rev         = list(reversed(bs_list))
+            # reverse the list so that values come after hex params
+            bs_list_rev         = list(reversed(bs_list))
 
-        values      = {}
-        # iterate through the list and if a param is found,
-        # add it as a key to the dict. The value for that key is a
-        # concatenation of all following elements in the list
-        # until a non-numeric element appears. This would either
-        # be the next param or the beginning hex value.
-        for i in range(len(bs_list_rev)-1):
-            if bs_list_rev[i] in params_values:
-                value_str = ''
-                j = i + 1
-                while j < len(bs_list_rev) and bs_list_rev[j].isdigit():
-                    value_str = bs_list_rev[j] + value_str
-                    j += 1
+            values      = {}
+            # iterate through the list and if a param is found,
+            # add it as a key to the dict. The value for that key is a
+            # concatenation of all following elements in the list
+            # until a non-numeric element appears. This would either
+            # be the next param or the beginning hex value.
+            for i in range(len(bs_list_rev)-1):
+                if bs_list_rev[i] in params_values:
+                    value_str = ''
+                    j = i + 1
+                    while j < len(bs_list_rev) and bs_list_rev[j].isdigit():
+                        value_str = bs_list_rev[j] + value_str
+                        j += 1
 
-                position    = params_values.index(bs_list_rev[i])
+                    position    = params_values.index(bs_list_rev[i])
 
-                key         = params_keys[position]
-                
-                values[key] = value_str
-                
-        if debug:
-            if not values: 
-                self.logger.log_message(f"Nothing found for {data}")
-            else:
-                self.logger.log_message(values)
+                    key         = params_keys[position]
+                    
+                    values[key] = value_str
+                    
+            if debug:
+                if not values: 
+                    self.logger.log_message(f"Nothing found for {data}")
+                else:
+                    self.logger.log_message(values)
 
-        # now format to the correct decimal place, or perform other formatting
-        for key,value in list(values.items()):
-            if not value.isdigit():
-                del values[key]
+            # now format to the correct decimal place, or perform other formatting
+            for key,value in list(values.items()):
+                if not value.isdigit():
+                    del values[key]
 
             val_int = int(value)                
             if key == "voltage":
@@ -220,26 +224,29 @@ class AnyDevice(gatt.Device):
                     values["power"] *= -1
             elif key == "temp":
                 temp    = val_int - 100
+                self.logger.log_message(f"Temp = {temp}")
 
-                if temp > 10:
-                    values[key] = temp
-            elif key == "accum_charge_cap":
-                values[key] = val_int / 1000    
-              
-            # add to the values to be averaged
-            self.add_to_average(key, values[key])
+                    if temp > 10:
+                        values[key] = temp
+                elif key == "accum_charge_cap":
+                    values[key] = val_int / 1000    
+                    
+                # add to the values to be averaged
+                self.add_to_average(key, values[key])
 
-        # Calculate percentage
-        if "ah_remaining" in values:
-            values["soc"] = values["ah_remaining"] / battery_capacity_ah * 100
-            self.add_to_average("soc", values["soc"])
+            # Calculate percentage
+            if "ah_remaining" in values:
+                values["soc"] = values["ah_remaining"] / battery_capacity_ah * 100
+                self.add_to_average("soc", values["soc"])
 
-        # Now it should be formatted corrected, in a dictionary
-        if debug:
-            self.logger.log_message(values) 
-        
-        # send to home assistant every minute            
-        self.send_to_ha()  
+            # Now it should be formatted corrected, in a dictionary
+            if debug:
+                self.logger.log_message(values) 
+            
+            # send to home assistant every minute            
+            self.send_to_ha()  
+        except Exception as e:
+            self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
 
 manager = gatt.DeviceManager(adapter_name='hci0')
 
