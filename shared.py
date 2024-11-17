@@ -115,6 +115,10 @@ class MqqtToHa:
             # client is connected
             try:
                 if not client.reconnect():
+                    self.logger.log_message('Reconnected')
+                    self.create_sensors()
+
+                    self.logger.log_message('Sensors created')
                     break
             except ConnectionRefusedError:
                 # if the server is not running,
@@ -128,8 +132,8 @@ class MqqtToHa:
             time.sleep(1)
 
     def on_message(self, client, userdata, message):
-        if( '$SYS/' not in message.topic):
-            self.logger.log_message(str(message.topic) + " " + str(message.payload.decode()) + str(userdata))
+        #if( '$SYS/' not in message.topic):
+        self.logger.log_message(str(message.topic) + " " + str(message.payload.decode()) + str(userdata))
 
     def on_log(self, client, userdata, paho_log_level, message):
         if paho_log_level == mqtt.LogLevel.MQTT_LOG_ERR:
