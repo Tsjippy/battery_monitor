@@ -8,7 +8,7 @@ os.chdir(os.path.dirname(os.path.realpath(__file__)))
 class Logger:
     def __init__(self, level='info'):
         self.log_level  = level
-        self.log_file   = 'battery_info_debug.log'
+        self.log_file   = 'log.log'
         print(f"Logging to {os.getcwd()}{self.log_file}")
 
     def log_message(self, msg='', type = 'info'):
