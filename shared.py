@@ -144,7 +144,7 @@ class MqqtToHa:
                 self.create_sensors()
 
                 self.logger.log_message('Sensors created')
-                
+
         if( 'SYS/' not in message.topic):
             self.logger.log_message(f"{message.topic} {message.payload.decode()}")
 
@@ -184,10 +184,11 @@ class MqqtToHa:
 
         #client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.username_pw_set(mqtt_username, mqtt_password)
-        self.client.on_connect   = self.on_connect
-        self.client.on_message   = self.on_message
-        self.client.on_log       = self.on_log
-        self.client.on_publish   = self.on_publish
+        self.client.on_connect      = self.on_connect
+        self.client.on_disconnect   = self.on_disconnect
+        self.client.on_message      = self.on_message
+        self.client.on_log          = self.on_log
+        self.client.on_publish      = self.on_publish
         self.client.will_set(f'system-sensors/sensor/{self.device_name}/availability', 'offline', retain=True)
 
         self.logger.log_message('Connecting to Home Assistant')
