@@ -50,12 +50,12 @@ class AnyDevice(gatt.Device):
 
         self.logger.log_message("[%s] Resolved services" % (self.mac_address))
         for service in self.services:
-            self.logger.log_message("[%s]  Service [%s]" % (self.mac_address, service.uuid))
+            self.logger.log_message("[%s] - Service [%s]" % (self.mac_address, service.uuid))
             for characteristic in service.characteristics:
                 if not NOTIFY_CHAR_UUID:
-                    self.logger.log_message("[%s]    Characteristic [%s]" % (self.mac_address, characteristic.uuid))
+                    self.logger.log_message("[%s] - Characteristic [%s]" % (self.mac_address, characteristic.uuid))
                 elif characteristic.uuid == NOTIFY_CHAR_UUID:
-                    self.logger.log_message("[%s]    Enabling Notifications for Characteristic [%s]" % (self.mac_address, characteristic.uuid))
+                    self.logger.log_message("[%s] - Enabling Notifications for Characteristic [%s]" % (self.mac_address, characteristic.uuid))
                     characteristic.enable_notifications()
 
     def characteristic_enable_notifications_succeeded(self, characteristic):

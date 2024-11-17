@@ -109,6 +109,7 @@ class MqqtToHa:
         self.logger.log_message('Sensors created')
 
     def on_disconnect(self, client, userdata, rc):
+        self.logger.log_message('Disconnected')
         while True:
             # loop until client.reconnect()
             # returns 0, which means the
@@ -132,8 +133,8 @@ class MqqtToHa:
             time.sleep(1)
 
     def on_message(self, client, userdata, message):
-        #if( '$SYS/' not in message.topic):
-        self.logger.log_message(str(message.topic) + " " + str(message.payload.decode()) + str(userdata))
+        if( 'SYS/' not in message.topic):
+            self.logger.log_message(f"{message.topic} {message.payload.decode()}")
 
     def on_log(self, client, userdata, paho_log_level, message):
         if paho_log_level == mqtt.LogLevel.MQTT_LOG_ERR:
