@@ -108,6 +108,25 @@ class MqqtToHa:
 
         self.logger.log_message('Sensors created')
 
+    def on_disconnect(self, client, userdata, rc):
+        while True:
+            # loop until client.reconnect()
+            # returns 0, which means the
+            # client is connected
+            try:
+                if not client.reconnect():
+                    break
+            except ConnectionRefusedError:
+                # if the server is not running,
+                # then the host rejects the connection
+                # and a ConnectionRefusedError is thrown
+                # getting this error > continue trying to
+                # connect
+                pass
+            # if the reconnect was not successful,
+            # wait one second
+            time.sleep(1)
+
     def on_message(self, client, userdata, message):
         if( '$SYS/' not in message.topic):
             self.logger.log_message(str(message.topic) + " " + str(message.payload.decode()) + str(userdata))
