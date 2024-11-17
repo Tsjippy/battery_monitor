@@ -136,16 +136,16 @@ class MqqtToHa:
         if message.topic == 'homeassistant/status':
             if message.payload.decode() == 'offline':
                 self.connected  = False
-                self.logger.log_message('Disconnected')
+                self.logger.log_message('Disconnected from Home Assistant')
             elif message.payload.decode() == 'online':
                 self.connected  = True
 
-                self.logger.log_message('Reconnected')
+                self.logger.log_message('Reconnected To Home Assistant')
                 self.create_sensors()
 
                 self.logger.log_message('Sensors created')
 
-        if( 'SYS/' not in message.topic):
+        elif( 'SYS/' not in message.topic):
             self.logger.log_message(f"{message.topic} {message.payload.decode()}")
 
     def on_log(self, client, userdata, paho_log_level, message):
