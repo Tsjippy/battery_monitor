@@ -133,6 +133,18 @@ class MqqtToHa:
             time.sleep(1)
 
     def on_message(self, client, userdata, message):
+        if message.topic == 'homeassistant/status':
+            if message.payload.decode() == 'offline':
+                self.connected  = False
+                self.logger.log_message('Disconnected')
+            elif message.payload.decode() == 'online':
+                self.connected  = True
+
+                self.logger.log_message('Reconnected')
+                self.create_sensors()
+
+                self.logger.log_message('Sensors created')
+                
         if( 'SYS/' not in message.topic):
             self.logger.log_message(f"{message.topic} {message.payload.decode()}")
 

@@ -224,7 +224,6 @@ class AnyDevice(gatt.Device):
                         values["power"] *= -1
                 elif key == "temp":
                     temp    = val_int - 100
-                    self.logger.log_message(f"Temp = {temp}")
 
                     if temp > 10:
                         values[key] = temp
