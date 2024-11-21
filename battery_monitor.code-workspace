@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../../../../../AppData/Roaming/Python/Python312/site-packages"
 		}
 	],
 	"settings": {}

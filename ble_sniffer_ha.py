@@ -35,12 +35,15 @@ class AnyDevice(gatt.Device):
     def connect_failed(self, error):
         super().connect_failed(error)
         self.logger.log_message("[%s] Connection failed: %s" % (self.mac_address, str(error)), 'error')
+
         # Try to connect again
-        #connect()
+        self.logger.log_message("[%s] Reconnecting in 10 seconds" % (self.mac_address), 'warning')
+        time.sleep(10)
+        self.connect()
 
     def disconnect_succeeded(self):
         super().disconnect_succeeded()
-        self.logger.log_message("[%s] Disconnected" % (self.mac_address), 'warning')
+        self.logger.log_message("[%s] Disconnected from Bluetooth Device" % (self.mac_address), 'warning')
         self.logger.log_message("[%s] Reconnecting in 10 seconds" % (self.mac_address), 'warning')
         time.sleep(10)
         self.connect()

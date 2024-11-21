@@ -92,7 +92,7 @@ class MqqtToHa:
 
     def on_connect(self, client, userdata, flags, reason_code):
         if reason_code == 0:
-            self.logger.log_message(f"Succesfuly connected")
+            self.logger.log_message(f"Succesfuly connected to Home Assistant")
         else:
             self.logger.log_message(f"Connected with result code {reason_code}", 'error')
 
