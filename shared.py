@@ -109,12 +109,13 @@ class MqqtToHa:
         self.logger.log_message('Sensors created')
 
     def on_disconnect(self, client, userdata, rc):
-        self.logger.log_message('Disconnected')
+        self.logger.log_message('Disconnected from Home Assistant')
         while True:
             # loop until client.reconnect()
             # returns 0, which means the
             # client is connected
             try:
+                self.logger.log_message('Trying to Reconnect to Home Assistant')
                 if not client.reconnect():
                     self.logger.log_message('Reconnected')
                     self.create_sensors()
@@ -129,8 +130,8 @@ class MqqtToHa:
                 # connect
                 pass
             # if the reconnect was not successful,
-            # wait one second
-            time.sleep(1)
+            # wait 10 seconds
+            time.sleep(10)
 
     def on_message(self, client, userdata, message):
         if message.topic == 'homeassistant/status':
