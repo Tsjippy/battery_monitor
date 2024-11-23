@@ -9,6 +9,7 @@ import logger
 #from paho.mqtt.enums import CallbackAPIVersion
 import time
 import importlib.metadata
+import sys
 
 class MqqtToHa:
     def __init__(self, device, sensors):
@@ -117,11 +118,13 @@ class MqqtToHa:
             try:
                 self.logger.log_message('Trying to Reconnect to Home Assistant')
                 if not client.reconnect():
-                    self.logger.log_message('Reconnected')
+                    self.logger.log_message('Reconnected to Home Assistant')
                     self.create_sensors()
 
-                    self.logger.log_message('Sensors created')
+                    self.logger.log_message('Sensors recreated')
                     break
+                else:
+                    self.logger.log_message('Trying to Reconnect to Home Assistant failed')
             except ConnectionRefusedError:
                 # if the server is not running,
                 # then the host rejects the connection
@@ -129,6 +132,9 @@ class MqqtToHa:
                 # getting this error > continue trying to
                 # connect
                 pass
+            except Exception as e:
+                self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+
             # if the reconnect was not successful,
             # wait 10 seconds
             time.sleep(10)
@@ -208,5 +214,7 @@ class MqqtToHa:
                 # Make this value configurable?
                 # this feels like a dirty hack. Is there some other way to do this?
                 time.sleep(600)
+            except Exception as e:
+                self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
         
         self.client.loop_start()
