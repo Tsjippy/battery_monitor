@@ -90,7 +90,7 @@ class MqqtToHa:
             self.sent[result.mid]    = payload
 
             if('init' in sensor):
-                self.send_value(sensor['name'], sensor['init'])
+                self.send_value(sensor, sensor['init'])
 
     def on_connect(self, client, userdata, flags, reason_code):
         if reason_code == 0:
