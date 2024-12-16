@@ -189,10 +189,7 @@ class MqqtToHa:
                     self.sensors[key]['offset']    = value
 
                 # Calculate the value
-                print('line 191-193')
-                print(value)
-                value   = value - self.sensors[key]['offset']
-                print(value)
+                value   = round(value - self.sensors[key]['offset'], 1)
             
             self.sensors[key]['last_update']   = time.time()
 
