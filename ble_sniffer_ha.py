@@ -131,7 +131,7 @@ class AnyDevice(gatt.Device):
                 if debug:
                     self.logger.log_message(f"Sending time: {timestring}") 
 
-                sensors.MqqtToHa.send_value('last_message', timestring, False)
+                sensors.MqqtToHa.send_value('last_message', str(timestring), False)
 
                 self.updating        = False
         except Exception as e:
