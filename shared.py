@@ -4,6 +4,7 @@ import paho.mqtt.client as mqtt
 import json
 from mqtt_secrets import *
 import logger
+from datetime import datetime
 
 #from paho.mqtt.enums import MQTTProtocolVersion
 #from paho.mqtt.enums import CallbackAPIVersion
@@ -46,7 +47,6 @@ class MqqtToHa:
         self.logger.log_message('Creating Sensors')
         
         device_id       = self.device['identifiers'][0]
-        
 
         for index,sensor in self.sensors.items():
             if 'sensortype' in sensor:
@@ -70,6 +70,9 @@ class MqqtToHa:
 
             if 'state' in sensor:
                 config_payload["state_class"]           = sensor['state']
+                
+                if sensor['state']  == 'TOTAL':
+                    sensor ['last_reset'] = config_payload['last_reset'] = datetime.now().isoformat(sep="T", timespec="seconds")
             
             if 'unit' in sensor:
                 config_payload["unit_of_measurement"]   = sensor['unit']
