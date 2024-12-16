@@ -84,7 +84,7 @@ class MqqtToHa:
             payload                                     = json.dumps(config_payload)
 
             # Send
-            result  = self.client.publish(topic=self.sensors[index]['base_topic'] + "/config", payload=payload, qos=1, retain=False)
+            result  = self.client.publish(topic=self.sensors[key]['base_topic'] + "/config", payload=payload, qos=1, retain=False)
 
             # Store
             self.sent[result.mid]    = payload
