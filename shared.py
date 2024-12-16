@@ -49,14 +49,14 @@ class MqqtToHa:
         
         device_id       = self.device['identifiers'][0]
 
-        for index,sensor in self.sensors.items():
+        for key, sensor in self.sensors.items():
             if 'sensortype' in sensor:
                 sensortype  = sensor['sensortype']
             else:
                 sensortype  = 'sensor'
 
             sensor_name                         = sensor['name'].replace(' ', '_').lower()
-            self.sensors[index]['base_topic']   = f"homeassistant/{sensortype}/{device_id}/{sensor_name}"
+            self.sensors[key]['base_topic']   = f"homeassistant/{sensortype}/{device_id}/{sensor_name}"
             unique_id                           = f"{self.device_name}_{sensor_name}"
 
             self.logger.log_message(f"Creating sensor '{sensor_name}' with unique id {unique_id}")
@@ -90,7 +90,7 @@ class MqqtToHa:
             self.sent[result.mid]    = payload
 
             if('init' in sensor):
-                self.send_value(sensor, sensor['init'])
+                self.send_value(key, sensor['init'])
 
     def on_connect(self, client, userdata, flags, reason_code):
         if reason_code == 0:
@@ -168,28 +168,29 @@ class MqqtToHa:
         del self.sent[mid]
 
     # Sends a sensor value
-    def send_value(self, sensor, value, send_json=True):
-        topic                   = sensor['base_topic'] + "/state"
+    def send_value(self, key, value, send_json=True):
+        print(self.sensors[key])
+        topic                   = self.sensors[key]['base_topic'] + "/state"
 
         # TOTAL_INCREASING sensor are counting total, we just want to report a daily total
-        if sensor['state'] == 'TOTAL_INCREASING':
+        if self.sensors[key]['state'] == 'TOTAL_INCREASING':
 
-            if 'last_update' in sensor:
+            if 'last_update' in self.sensors[key]:
                 today               = datetime.now().strftime('%Y-%m-%d')
-                last_update_date    = strftime('%Y-%m-%d', localtime(sensor['last_update']))
+                last_update_date    = strftime('%Y-%m-%d', localtime(self.sensors[key]['last_update']))
 
                 #Last update was yesterday
                 if today > last_update_date:
-                    sensor['offset']    = value
+                    self.sensors[key]['offset']    = value
             
             # offset is not yet defined
             if not 'offset' in sensor:
-                sensor['offset']    = value
+                self.sensors[key]['offset']    = value
 
             # Calculate the value
-            value   = value - sensor['offset']
+            value   = value - self.sensors[key]['offset']
         
-        sensor['last_update']   = time.time()
+        self.sensors[key]['last_update']   = time.time()
 
         if send_json:
             payload                 = json.dumps(value)
