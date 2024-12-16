@@ -175,6 +175,7 @@ class MqqtToHa:
             # TOTAL_INCREASING sensor are counting total, we just want to report a daily total
             if self.sensors[key]['state'] == 'TOTAL_INCREASING':
                 print( self.sensors[key])
+                print( value )
 
                 if 'last_update' in self.sensors[key]:
                     today               = datetime.now().strftime('%Y-%m-%d')
