@@ -169,6 +169,7 @@ class MqqtToHa:
 
     # Sends a sensor value
     def send_value(self, key, value, send_json=True):
+        print('Line 172-173')
         print(self.sensors[key])
         topic                   = self.sensors[key]['base_topic'] + "/state"
 

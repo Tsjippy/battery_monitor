@@ -118,6 +118,9 @@ class AnyDevice(gatt.Device):
                         val   = self.average(value, 1)
 
                     if val > -99:
+                        print('line 121 - 123')
+                        print(key)
+                        print(val)
                         sensors.MqqtToHa.send_value(key, val)
                     
                     # reset the values  
