@@ -170,8 +170,6 @@ class MqqtToHa:
     # Sends a sensor value
     def send_value(self, key, value, send_json=True):
         try:
-            print('Line 172-173')
-            print(self.sensors[key])
             topic                   = self.sensors[key]['base_topic'] + "/state"
 
             # TOTAL_INCREASING sensor are counting total, we just want to report a daily total
@@ -190,7 +188,10 @@ class MqqtToHa:
                     self.sensors[key]['offset']    = value
 
                 # Calculate the value
+                print('line 191-193')
+                print(value)
                 value   = value - self.sensors[key]['offset']
+                print(value)
             
             self.sensors[key]['last_update']   = time.time()
 
