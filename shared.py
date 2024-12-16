@@ -169,45 +169,48 @@ class MqqtToHa:
 
     # Sends a sensor value
     def send_value(self, key, value, send_json=True):
-        print('Line 172-173')
-        print(self.sensors[key])
-        topic                   = self.sensors[key]['base_topic'] + "/state"
+        try:
+            print('Line 172-173')
+            print(self.sensors[key])
+            topic                   = self.sensors[key]['base_topic'] + "/state"
 
-        # TOTAL_INCREASING sensor are counting total, we just want to report a daily total
-        if self.sensors[key]['state'] == 'TOTAL_INCREASING':
+            # TOTAL_INCREASING sensor are counting total, we just want to report a daily total
+            if self.sensors[key]['state'] == 'TOTAL_INCREASING':
 
-            if 'last_update' in self.sensors[key]:
-                today               = datetime.now().strftime('%Y-%m-%d')
-                last_update_date    = strftime('%Y-%m-%d', localtime(self.sensors[key]['last_update']))
+                if 'last_update' in self.sensors[key]:
+                    today               = datetime.now().strftime('%Y-%m-%d')
+                    last_update_date    = strftime('%Y-%m-%d', localtime(self.sensors[key]['last_update']))
 
-                #Last update was yesterday
-                if today > last_update_date:
+                    #Last update was yesterday
+                    if today > last_update_date:
+                        self.sensors[key]['offset']    = value
+                
+                # offset is not yet defined
+                if not 'offset' in self.sensors[key]:
                     self.sensors[key]['offset']    = value
+
+                # Calculate the value
+                value   = value - self.sensors[key]['offset']
             
-            # offset is not yet defined
-            if not 'offset' in sensor:
-                self.sensors[key]['offset']    = value
+            self.sensors[key]['last_update']   = time.time()
 
-            # Calculate the value
-            value   = value - self.sensors[key]['offset']
-        
-        self.sensors[key]['last_update']   = time.time()
+            if send_json:
+                payload                 = json.dumps(value)
+            else:
+                payload                 = value
 
-        if send_json:
-            payload                 = json.dumps(value)
-        else:
-            payload                 = value
+            # add current messgae to the queue
+            self.queue[topic]   = payload
 
-        # add current messgae to the queue
-        self.queue[topic]   = payload
-
-        if not self.connected:
-            self.logger.log_message('Not connected, adding to queue', 'warning')
-        else:
-            # post queued messages
-            for topic, payload in self.queue.items():
-                result                  = self.client.publish(topic=topic, payload=payload, qos=1, retain=False)
-                self.sent[result.mid]   = payload
+            if not self.connected:
+                self.logger.log_message('Not connected, adding to queue', 'warning')
+            else:
+                # post queued messages
+                for topic, payload in self.queue.items():
+                    result                  = self.client.publish(topic=topic, payload=payload, qos=1, retain=False)
+                    self.sent[result.mid]   = payload
+        except Exception as e:
+            self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
 
     def main(self):
         self.logger.log_message('Starting application')
