@@ -3,8 +3,9 @@ from struct import *
 import paho.mqtt.client as mqtt
 import json
 from mqtt_secrets import *
-import logger
 from datetime import datetime
+from time import strftime, localtime
+import logger
 
 #from paho.mqtt.enums import MQTTProtocolVersion
 #from paho.mqtt.enums import CallbackAPIVersion
@@ -50,7 +51,7 @@ class MqqtToHa:
 
         for index,sensor in self.sensors.items():
             if 'sensortype' in sensor:
-                sensortype = sensor['sensortype']
+                sensortype  = sensor['sensortype']
             else:
                 sensortype  = 'sensor'
 
@@ -70,9 +71,6 @@ class MqqtToHa:
 
             if 'state' in sensor:
                 config_payload["state_class"]           = sensor['state']
-                
-                if sensor['state']  == 'TOTAL':
-                    sensor ['last_reset'] = config_payload['last_reset'] = datetime.now().isoformat(sep="T", timespec="seconds")
             
             if 'unit' in sensor:
                 config_payload["unit_of_measurement"]   = sensor['unit']
@@ -170,8 +168,28 @@ class MqqtToHa:
         del self.sent[mid]
 
     # Sends a sensor value
-    def send_value(self, name, value, send_json=True):
-        topic                   = "homeassistant/sensor/" + self.device['identifiers'][0] + '/' + name.replace(' ', '_').lower() + "/state"
+    def send_value(self, sensor, value, send_json=True):
+        topic                   = sensor['base_topic'] + "/state"
+
+        # TOTAL_INCREASING sensor are counting total, we just want to report a daily total
+        if sensor['state'] == 'TOTAL_INCREASING':
+
+            if 'last_update' in sensor:
+                today               = datetime.now().strftime('%Y-%m-%d')
+                last_update_date    = strftime('%Y-%m-%d', localtime(sensor['last_update']))
+
+                #Last update was yesterday
+                if today > last_update_date:
+                    sensor['offset']    = value
+            
+            # offset is not yet defined
+            if not 'offset' in sensor:
+                sensor['offset']    = value
+
+            # Calculate the value
+            value   = value - sensor['offset']
+        
+        sensor['last_update']   = time.time()
 
         if send_json:
             payload                 = json.dumps(value)

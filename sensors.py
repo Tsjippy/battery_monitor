@@ -70,14 +70,14 @@ sensors = {
     },
     'discharge': {
         "name": "Discharged Today",
-        "state": "TOTAL",
+        "state": "TOTAL_INCREASING",
         "unit": "kWh",
         "type": "ENERGY_STORAGE",
         #"icon": "mdi:thermometer"
     },
     'charge': {
         "name": "Charged Today",
-        "state": "TOTAL",
+        "state": "TOTAL_INCREASING",
         "unit": "kWh",
         "type": "ENERGY_STORAGE",
         #"icon": "mdi:thermometer"

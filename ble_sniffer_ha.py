@@ -110,7 +110,7 @@ class AnyDevice(gatt.Device):
                     if not key in sensors.sensors:
                         continue
                     
-                    name    = sensors.sensors[key]['name']
+                    sensor  = sensors.sensors[key]
 
                     if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
                         val   = self.average(value * 48 , 2)
@@ -120,7 +120,7 @@ class AnyDevice(gatt.Device):
                         val   = self.average(value, 1)
 
                     if val > -99:
-                        sensors.MqqtToHa.send_value(name, val)
+                        sensors.MqqtToHa.send_value(sensor, val)
                     
                     # reset the values  
                     self.avg_values[key] = []  
