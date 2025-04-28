@@ -11,6 +11,9 @@ class Logger:
         self.log_file   = 'log.log'
         print(f"Logging to {os.getcwd()}{self.log_file}")
 
+        with open(self.log_file) as f:
+            self.log_data = f.readlines()
+
     def log_message(self, msg='', type = 'info'):
         msg     = str(msg)
         type    = str(type).lower()
@@ -37,8 +40,13 @@ class Logger:
             print(log_msg)
 
             try:
-                f   = open(self.log_file, "a", encoding="utf-8")
-                f.write(log_msg + "\n")
+                self.log_data.append(log_msg + "\n")
+
+                if len(self.log_data > 1000):
+                    self.log_data   = self.log_data[1:]
+
+                f   = open(self.log_file, "w", encoding="utf-8")
+                f.writelines(self.log_data)
                 f.close()
             except PermissionError:
                 print(f"No permission to write to {self.log_file}")

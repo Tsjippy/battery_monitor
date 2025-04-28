@@ -199,15 +199,21 @@ class MqqtToHa:
             else:
                 payload                 = value
 
-            # add current messgae to the queue
+            # add current message to the queue
             self.queue[topic]   = payload
 
             if not self.connected:
                 self.logger.log_message('Not connected, adding to queue', 'warning')
             else:
+                self.logger.log_message('Processing queue')
+
                 # post queued messages
                 for topic, payload in self.queue.items():
-                    result                  = self.client.publish(topic=topic, payload=payload, qos=1, retain=False)
+                    result                  = self.client.publish( topic=topic, payload=payload, qos=1, retain=False )
+
+                    self.logger.log_message(f'Sending next message')
+                    self.logger.log_message(result)
+
                     self.sent[result.mid]   = payload
         except Exception as e:
             self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
