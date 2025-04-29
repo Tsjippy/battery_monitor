@@ -40,10 +40,10 @@ class Logger:
             print(log_msg)
 
             try:
-                self.log_data.append(log_msg + "\n")
+                self.log_data.insert(0, log_msg + "\n")
 
-                if len(self.log_data > 1000):
-                    self.log_data   = self.log_data[1:]
+                if len(self.log_data) > 1000:
+                    self.log_data   = self.log_data[:1000]
 
                 f   = open(self.log_file, "w", encoding="utf-8")
                 f.writelines(self.log_data)

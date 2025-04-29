@@ -29,3 +29,4 @@ mqtt_secrets.py
 *pycache*
 *.save*
 *.log
+shared.py
