@@ -72,19 +72,19 @@ sensors = {
         "name": "Discharged Today",
         "state": "TOTAL_INCREASING",
         "unit": "kWh",
-        "type": "ENERGY_STORAGE",
+        "type": "measurement",
         #"icon": "mdi:thermometer"
     },
     'charge': {
         "name": "Charged Today",
         "state": "TOTAL_INCREASING",
         "unit": "kWh",
-        "type": "ENERGY_STORAGE",
+        "type": "measurement",
         #"icon": "mdi:thermometer"
     },
     'last_message': {
         'name': 'Last Message',
-        "state": "measurement",
+        "state": "None",
         'type': 'timestamp',
         'icon': 'mdi:clock-check'
     },

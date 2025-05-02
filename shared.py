@@ -205,23 +205,23 @@ class MqqtToHa:
             if not self.connected:
                 self.logger.log_message('Not connected, adding to queue', 'warning')
             else:
-                self.logger.log_message('Processing queue')
+                #self.logger.log_message('Processing queue')
 
                 # post queued messages
                 for topic, payload in self.queue.items():
                     result                  = self.client.publish( topic=topic, payload=payload, qos=1, retain=False )
 
-                    self.logger.log_message(f'Sending next message {result}')
+                    # self.logger.log_message(f'Sending next message {result}')
 
                     self.sent[result.mid]   = payload
                     
-                    if len(self.sent) > 10000:
-                        self.logger.log_message(f'I feel like the messages do not arrive')
-                        self.client.disconnect()
-                        self.client.loop_stop()
-                        self.sent   = {}
+                    #if len(self.sent) > 10000:
+                        #self.logger.log_message(f'I feel like the messages do not arrive')
+                        #self.client.disconnect()
+                        #self.client.loop_stop()
+                        #self.sent   = {}
 
-                        self.main()
+                        #self.main()
 
         except Exception as e:
             self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
