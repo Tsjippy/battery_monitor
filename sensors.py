@@ -41,7 +41,7 @@ sensors = {
         "icon": "mdi:thermometer"
     },
     'soc': {
-        "name": "Socket",
+        "name": "Soc",
         "state": "measurement",
         "unit": "%",
         "type": "BATTERY",
