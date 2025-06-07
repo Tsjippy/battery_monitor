@@ -11,8 +11,11 @@ class Logger:
         self.log_file   = 'log.log'
         print(f"Logging to {os.getcwd()}{self.log_file}")
 
-        with open(self.log_file) as f:
-            self.log_data = f.readlines()
+        try:
+            with open(self.log_file) as f:
+                self.log_data = f.readlines()
+        except:
+            self.log_data = []
 
     def log_message(self, msg='', type = 'info'):
         msg     = str(msg)
