@@ -1,160 +1,95 @@
-#https://github.com/chriskomus/ble-sniffer-walkthrough
-
-import gatt
-import time
-from datetime import datetime, timezone
-import sys
-
-import sensors
+from bleak import BleakScanner, BleakClient, BleakError
+import asyncio
 import logger
+import sys
+import json
+import mqtt
+import sensors
+from datetime import datetime
+import signal
+import os
 
-updateInterval      = 10 #in seconds
-debug               = False
-NOTIFY_CHAR_UUID    = '0000ffe1-0000-1000-8000-00805f9b34fb'
-MAC_ADDRESS         = '38:3b:26:79:6f:c5'
-battery_capacity_ah = 400 # Ah      
+class DeviceNotFoundError(Exception):
+    pass
 
-class AnyDeviceManager(gatt.DeviceManager):
-    def device_discovered(self, device):
-        self.logger.log_message("Discovered [%s] %s" % (device.mac_address, device.alias()))
-
-class AnyDevice(gatt.Device):
-    def __init__(self, mac_address, manager):
-        super().__init__(mac_address, manager)
-
+class JunctekMonitor:
+    def __init__(self):
+        self.should_quit        = False
+        self.found              = []
         self.charging           = False
-        self.last_dom_update    = int(time.time())  
-        self.updating           = False 
-        self.avg_values         = {}
-        self.logger             = logger.Logger('info')
-    
-    def connect_succeeded(self):
-        super().connect_succeeded()
-        self.logger.log_message("[%s] Connected" % (self.mac_address))
+        file_path		        = '/data/options.json'
+        self.local		        = False
+        self.device             = None
 
-    def connect_failed(self, error):
-        super().connect_failed(error)
-        self.logger.log_message("[%s] Connection failed: %s" % (self.mac_address, str(error)), 'error')
+        signal.signal(signal.SIGTERM, self.signal_handler)
 
-        # Try to connect again
-        self.logger.log_message("[%s] Reconnecting in 10 seconds" % (self.mac_address), 'warning')
-        time.sleep(10)
-        self.connect()
+        self.params = {
+            "voltage":          "c0",       
+            "current":          "c1",       # Amps
+            "cur_soc":          "d0",       # %
+            "dir_of_current":   "d1",   
+            "ah_remaining":     "d2",
+            "discharge":        "d3",		# todays total in kWh
+            "charge":           "d4",       # todays total in kWh
+            "accum_charge_cap": "d5",       # accumulated charging capacity Ah (/1000)
+            "mins_remaining":   "d6",
+            "power":            "d8",       # Watt
+            "temp":             "d9",       # C
+            "full_charge_volt": "e6",
+            "zero_charge_volt": "e7",
+        }
 
-    def disconnect_succeeded(self):
-        super().disconnect_succeeded()
-        self.logger.log_message("[%s] Disconnected from Bluetooth Device" % (self.mac_address), 'warning')
-        self.logger.log_message("[%s] Reconnecting in 10 seconds" % (self.mac_address), 'warning')
-        time.sleep(10)
-        self.connect()
+        self.params_keys         = list(self.params.keys())
+        self.params_values       = list(self.params.values())
 
-    def services_resolved(self):
-        super().services_resolved()
+        if not os.path.exists(file_path):
+            self.local	= True
+            file_path	= os.path.dirname(os.path.realpath(__file__))+file_path
+					
+        # Get Options
+        with open(file_path, mode="r") as data_file:
+            config = json.load(data_file)
+            self.log_level           = config.get('log_level')
+            self.mac_address         = config.get('macaddress').upper()
+            self.battery_capacity    = int(config.get('battery capacity'))
+            self.battery_voltage     = int(config.get('voltage'))
 
-        self.logger.log_message("[%s] Resolved services" % (self.mac_address))
-        for service in self.services:
-            self.logger.log_message("[%s] - Service [%s]" % (self.mac_address, service.uuid))
-            for characteristic in service.characteristics:
-                if not NOTIFY_CHAR_UUID:
-                    self.logger.log_message("[%s] - Characteristic [%s]" % (self.mac_address, characteristic.uuid))
-                elif characteristic.uuid == NOTIFY_CHAR_UUID:
-                    self.logger.log_message("[%s] - Enabling Notifications for Characteristic [%s]" % (self.mac_address, characteristic.uuid))
-                    characteristic.enable_notifications()
+        self.logger                  = logger.Logger(self)
 
-    def characteristic_enable_notifications_succeeded(self, characteristic):
-        self.logger.log_message('characteristic_enable_notifications_succeeded')
-
-    def characteristic_enable_notifications_failed(self, characteristic, error):
-        self.logger.log_message('characteristic_enable_notifications_failed', 'error')
-
-    def characteristic_value_updated(self, characteristic, value):
-        super().characteristic_value_updated(characteristic, value)
-        self.on_data_received(value)
-
-    def on_data_received(self, value):
-        if debug:
-            self.logger.log_message(f"Got packet of len(value)={len(value)}: {value.hex()}")
-        self.process_data(value.hex())
-        
-    def add_to_average(self, key, value):
-        # add to the values to be averaged
-        if key not in self.avg_values:
-            self.avg_values[key] = [value]
+        if self.log_level == 'debug':
+            self.debug              = True
         else:
-            self.avg_values[key].append(value)
-            
-    def average(self, lst, decimals=1): 
-        if debug:
-            self.logger.log_message(lst)
-            
-        if len(lst)  == 0:
-            return -99
-            
-        return round((sum(lst) / len(lst)) , decimals)
+            self.debug              = False
+
+        self.MqqtToHa               = mqtt.MqqtToHa(self)
+
+        self.stop_event             = asyncio.Event()
+        self.disconnect_event       = asyncio.Event()
         
-    def send_to_ha(self):
+
+    def signal_handler(self, sig, frame):
+        self.logger.warning(f'Received signal {sig}')
+        self.logger.warning('Cleaning up...')
+        
+        # Set the shutdown flag
+        self.should_quit    = True
+
+    async def discover(self):
         try:
-            if debug:
-                self.logger.log_message("Time to ha update: "+ str(updateInterval - (int( time.time()) - self.last_dom_update)))
-                
-            if((int( time.time()) - self.last_dom_update) > updateInterval and not self.updating):
-                # set to True to prevent it to run a new update before the previous one is finished
-                self.updating        = True
+            devices    = await BleakScanner.discover()
 
-                self.last_dom_update = int(time.time())
-                
-                if debug:
-                    self.logger.log_message(self.avg_values) 
-                
-                for key, value in self.avg_values.items():
-                    if not key in sensors.sensors:
-                        continue
+            self.logger.debug("Found Devices")
+            for device in devices:
+                self.logger.info(f"BT Device found:\nName: {device.name}\nAddress: {device.address}")
+                self.logger.debug(device)
 
-                    if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
-                        val   = self.average(value * 48 , 2)
-                    elif key == "mins_remaining":
-                        val   = self.average(value, 0)
-                    else:
-                        val   = self.average(value, 1)
-
-                    if val > -99:
-                        sensors.MqqtToHa.send_value(key, val)
-                    
-                    # reset the values  
-                    self.avg_values[key] = []  
-
-                # https://www.home-assistant.io/docs/configuration/templating/#time
-                # 2023-07-30T20:03:49.253717+00:00
-                timestring  = str(datetime.now(datetime.now().astimezone().tzinfo).isoformat())
-                if debug:
-                    self.logger.log_message(f"Sending time: {timestring}") 
-
-                sensors.MqqtToHa.send_value('last_message', timestring, False)
-
-                self.updating        = False
+            self.logger.debug("Finished discovery")
         except Exception as e:
-            self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
-                
-    def process_data(self, data):
-        try:
-            params = {
-                "voltage":          "c0",       
-                "current":          "c1",       # Amps
-                "cur_soc":          "d0",       # %
-                "dir_of_current":   "d1",   
-                "ah_remaining":     "d2",
-                "discharge":        "d3",		# todays total in kWh
-                "charge":           "d4",       # todays total in kWh
-                "accum_charge_cap": "d5",       # accumulated charging capacity Ah (/1000)
-                "mins_remaining":   "d6",
-                "power":            "d8",       # Watt
-                "temp":             "d9",       # C
-                "full_charge_volt": "e6",
-                "zero_charge_volt": "e7",
-            }
+            self.logger.error(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
 
-            params_keys         = list(params.keys())
-            params_values       = list(params.values())
+    async def process_data(self, _, value):       
+        try:
+            data = str(value.hex())
 
             # split bs into a list of all values and hex keys
             bs_list             = [data[i:i+2] for i in range(0, len(data), 2)]
@@ -169,34 +104,36 @@ class AnyDevice(gatt.Device):
             # until a non-numeric element appears. This would either
             # be the next param or the beginning hex value.
             for i in range(len(bs_list_rev)-1):
-                if bs_list_rev[i] in params_values:
+                if bs_list_rev[i] in self.params_values:
                     value_str = ''
                     j = i + 1
                     while j < len(bs_list_rev) and bs_list_rev[j].isdigit():
                         value_str = bs_list_rev[j] + value_str
                         j += 1
 
-                    position    = params_values.index(bs_list_rev[i])
+                    position    = self.params_values.index(bs_list_rev[i])
 
-                    key         = params_keys[position]
+                    key         = self.params_keys[position]
                     
                     values[key] = value_str
                     
-            if debug:
+            if self.debug:
                 if not values: 
-                    self.logger.log_message(f"Nothing found for {data}")
+                    self.logger.warning(f"Nothing found for {data}")
                 else:
-                    self.logger.log_message(values)
+                    self.logger.debug(f"Raw values: {values}")
 
             # now format to the correct decimal place, or perform other formatting
-            for key,value in list(values.items()):
+            for key, value in list(values.items()):
                 if not value.isdigit():
                     del values[key]
 
                 val_int = int(value)                
                 if key == "voltage":
                     voltage   = val_int / 100 
-                    if voltage > 40:
+
+                    # Only keep valid values leave out unrealistically values
+                    if voltage > ( self.battery_voltage - (self.battery_voltage * 0.2)):
                         values[key] = voltage               
                 elif key == "current":
                     values[key] = val_int / 100
@@ -230,92 +167,147 @@ class AnyDevice(gatt.Device):
                         values[key] = temp
                 elif key == "accum_charge_cap":
                     values[key] = val_int / 1000    
-                    
-                # add to the values to be averaged
-                self.add_to_average(key, values[key])
 
             # Calculate percentage
             if "ah_remaining" in values:
-                values["soc"] = values["ah_remaining"] / battery_capacity_ah * 100
-                self.add_to_average("soc", values["soc"])
+                values["soc"] = values["ah_remaining"] / self.battery_capacity * 100
 
             # Now it should be formatted corrected, in a dictionary
-            if debug:
-                self.logger.log_message(values) 
-            
-            # send to home assistant every minute            
-            self.send_to_ha()  
+            if self.debug:
+                self.logger.debug(f"Final values: {values}")
+
+            await self.send_to_ha(values)
+
         except Exception as e:
-            self.logger.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+            self.logger.error(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
 
-manager = gatt.DeviceManager(adapter_name='hci0')
+    async def send_to_ha(self, values):
+        try:           
+            for key, value in values.items():
+                if not key in sensors.sensors:
+                    continue
 
-lgr = logger.Logger()
+                if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
+                    val   = round(value *  self.battery_voltage, 2)
+                elif key == "mins_remaining":
+                    val   = round(value , 0)
+                else:
+                    val   = round(value , 1)
 
-# Run discovery
-manager.update_devices()
-lgr.log_message("Starting discovery...")
-# scan all the advertisements from the services list
-manager.start_discovery()
-discovering = True
-wait = 15
-found = []
-# delay / sleep for 10 ~ 15 sec to complete the scanning
-while discovering:
-    time.sleep(1)
-    f = len(manager.devices())
-    lgr.log_message("Found {} BLE-devices so far".format(f))
-    found.append(f)
-    if len(found) > 5:
-        if found[len(found) - 5] == f:
-            # We did not find any new devices the last 5 seconds
-            discovering = False
-    wait = wait - 1
-    if wait == 0:
-        discovering = False
-
-manager.stop_discovery()
-lgr.log_message("Found {} BLE-devices".format(len(manager.devices())))
-
-def connect():
-    for dev in manager.devices():
-        lgr.log_message("Processing device {} {}".format(dev.mac_address, dev.alias()))
-        if MAC_ADDRESS:
-            mac = MAC_ADDRESS.lower()
-            if dev.mac_address.lower() == mac:
-                lgr.log_message("Trying to connect to {}...".format(dev.mac_address))
-
-                try:
-                    device = AnyDevice(mac_address=mac, manager=manager)
-                    lgr.log_message("Connected!")
-                except Exception as e:
-                    lgr.log_message(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+                if val > -99:
+                    self.MqqtToHa.send_value(key, val)
                     
-                    lgr.log_message("Trying again, terminate with Ctrl+C")
-                    connect()
+            # https://www.home-assistant.io/docs/configuration/templating/#time
+            # 2023-07-30T20:03:49.253717+00:00
+            timestring  = str(datetime.now(datetime.now().astimezone().tzinfo).isoformat())
+            if self.debug:
+                self.logger.debug(f"Sending time: {timestring}") 
 
-                device.connect()
-        
-connect()
+            self.MqqtToHa.send_value('last_message', timestring, False)
+        except Exception as e:
+            self.logger.error(f"{str(e)} on line {sys.exc_info()[-1].tb_lineno}")
 
-if MAC_ADDRESS:
-    lgr.log_message("Terminate with Ctrl+C")
+    def scanner_callback(self, device, advertisement_data):
+        try:
+            name    = advertisement_data.local_name
 
-    try:
-        manager.run()
-    except KeyboardInterrupt:
-        lgr.log_message("Terminating")
-        sensors.MqqtToHa.logger.log_message('Program killed: running cleanup code')
-        sensors.MqqtToHa.client.publish(f'system-sensors/sensor/{sensors.MqqtToHa.device_name}/availability', 'offline', retain=True)
-        sensors.MqqtToHa.client.disconnect()
-        sensors.MqqtToHa.client.loop_stop()
-        sys.stdout.flush()
-        lgr.log_message("Succesfully terminated")
-    except Exception as e:
-        lgr.log_message(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+            if device.address.upper() == self.mac_address:
+                self.logger.info(f"Found device\nAddress: {device.address}\nName: {name}\nRssi: {advertisement_data.rssi}")
+                self.device = device
+                self.stop_event.set()
+            elif not device.address in self.found:
+                self.found.append(device.address)
 
-    for dev in manager.devices():
-        dev.disconnect()
-else:
-    lgr.log_message("Choose a mac address from the list and enter it into ble_config.ini")
+                if name == None:
+                    self.logger.info(f"Found '{device.address}'")
+                else:
+                    self.logger.info(f"Found '{name}' with address '{device.address}'")
+            else:
+                if name == None:
+                    self.logger.debug(f"'{device.address}' is not: {self.mac_address}")
+                else:
+                    self.logger.debug(f"{name} with address '{device.address}' is not: {self.mac_address}")
+        except Exception as e:
+            self.logger.error(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+
+    def disconnected_callback(self, client):
+        try:
+            self.logger.debug(f"Disconnected {client}")
+            self.disconnect_event.set()
+            self.stop_event.clear()
+            self.device = None
+        except Exception as e:
+            self.logger.error(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+
+    async def connect(self):
+        try:
+            # Do not run if already connected
+            if self.device != None:
+                return
             
+            async with BleakScanner(self.scanner_callback) as scanner:
+                # Important! Wait for an event to trigger stop, otherwise scanner
+                # will stop immediately.
+                await self.stop_event.wait()
+                self.logger.info(f"Connected to {self.device}")
+        
+            # scanner stops when block exits
+        except Exception as e:
+            self.logger.error(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+
+    async def main(self):
+        while not self.should_quit:
+            await  self.connect()
+
+            self.logger.info("Starting Listener")
+            try:
+                while self.device == None:
+                    self.logger.debug("Waiting for device conection")
+                    await asyncio.sleep(5)
+
+                async with BleakClient(self.device, disconnected_callback=self.disconnected_callback) as client:
+                    self.logger.info(f"Connected to {self.device.name}")
+                    
+                    read_characteristic_uuid = "0000fff1-0000-1000-8000-00805f9b34fb"
+                    
+                    self.logger.debug(f"read_characteristic_uuid is {read_characteristic_uuid}")
+                    
+                    await client.start_notify(read_characteristic_uuid, self.process_data)
+
+                    # Wait till disconnected
+                    await self.disconnect_event.wait()
+
+                    await asyncio.sleep(5)
+
+                    # Now run again to connect again
+                    self.disconnect_event.clear()
+            except BleakError as e:
+                self.logger.error(f"Error: {e}")
+                #continue  # continue in error case 
+            except TimeoutError as e:
+                self.logger.debug(f"Timeout {e}")
+            except Exception as e:
+                if str(e) != '':
+                    self.logger.error(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+
+            await asyncio.sleep(5)
+
+if __name__ == "__main__":
+    try:
+        junctekMonitor  = JunctekMonitor()
+
+        if junctekMonitor.mac_address == '':
+            junctekMonitor.logger.debug("Starting discovery")
+            asyncio.run(junctekMonitor.discover())
+        else:
+            junctekMonitor.logger.debug("Starting connection")
+            asyncio.run(junctekMonitor.main())
+
+            junctekMonitor.logger.info("Finished")
+    except KeyboardInterrupt:
+        junctekMonitor.logger.debug("ctrl+c pressed")
+    except Exception as e:
+        junctekMonitor.logger.error(f" {str(e)} on line {sys.exc_info()[-1].tb_lineno}")
+        """         async with BleakClient(device) as client:
+            self.logger.debug("connected")
+            await client.stop_notify(read_characteristic_uuid) """

@@ -1,3 +1,5 @@
+import shared
+
 # The main device that contains the sensors
 device              = {
     "identifiers": [
@@ -5,7 +7,7 @@ device              = {
     ],
     "name": "Battery Status Monitor",
     "model": "Junctec",
-    "manufacturer": "Juntek"
+    "manufacturer": "Ewald Harmsen"
 }
 
 # Sensor definition
@@ -39,7 +41,7 @@ sensors = {
         "icon": "mdi:thermometer"
     },
     'soc': {
-        "name": "State of Charge",
+        "name": "Soc",
         "state": "measurement",
         "unit": "%",
         "type": "BATTERY",
@@ -68,22 +70,24 @@ sensors = {
     },
     'discharge': {
         "name": "Discharged Today",
-        "state": "measurement",
+        "state": "TOTAL_INCREASING",
         "unit": "kWh",
-        "type": "ENERGY_STORAGE",
+        "type": "measurement",
         #"icon": "mdi:thermometer"
     },
     'charge': {
         "name": "Charged Today",
-        "state": "measurement",
+        "state": "TOTAL_INCREASING",
         "unit": "kWh",
-        "type": "ENERGY_STORAGE",
+        "type": "measurement",
         #"icon": "mdi:thermometer"
     },
     'last_message': {
         'name': 'Last Message',
-        "state": None,
+        "state": "None",
         'type': 'timestamp',
         'icon': 'mdi:clock-check'
     },
 }
+
+MqqtToHa    = shared.MqqtToHa(device, sensors)

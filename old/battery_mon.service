@@ -1,0 +1,14 @@
+[Unit]
+Description = Fetched battery data over bluetooth and sends it to Home Assignment
+After = network.target
+ 
+[Service]
+Type = simple
+ExecStart = python3 /home/pi/battery_monitor/ble_sniffer_ha.py 
+User = pi
+Restart = on-failure
+RestartSec = 5
+TimeoutStartSec = infinity
+ 
+[Install]
+WantedBy = multi-user.target
