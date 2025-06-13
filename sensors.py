@@ -39,7 +39,7 @@ sensors = {
         "icon": "mdi:thermometer"
     },
     'soc': {
-        "name": "State of Charge",
+        "name": "State if Charge,
         "state": "measurement",
         "unit": "%",
         "type": "BATTERY",
