@@ -138,7 +138,7 @@ class JunctekMonitor:
                 elif key == "current":
                     values[key] = val_int / 100
                     
-                    if self.charging == False:
+                    if self.charging == True:
                         values["current"] *= -1
                 elif key == "discharge":
                     values[key] = val_int / 100000
