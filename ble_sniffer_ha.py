@@ -188,13 +188,14 @@ class JunctekMonitor:
                     continue
 
                 if key == "ah_remaining" or key == "cap" or key == "accum_charge_cap" or key == "discharge" or key == "charge":
-                    val   = round(value *  self.battery_voltage, 2)
+                    # val   = round(value *  self.battery_voltage, 2)
+                    val   = round(value, 2)
                 elif key == "mins_remaining":
                     val   = round(value , 0)
                 else:
                     val   = round(value , 1)
 
-                if val > -99:
+                if val > -9900:
                     self.MqqtToHa.send_value(key, val)
                     
             # https://www.home-assistant.io/docs/configuration/templating/#time
